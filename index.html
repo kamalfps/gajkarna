@@ -567,13 +567,13 @@
 
     // --- FIREBASE CONFIG ---
     const firebaseConfig = {
-  apiKey: "AIzaSyAe1mZbAfdICSTbprjRz1vbbJJwRRtsTvE",
-  authDomain: "gajkarna-f515d.firebaseapp.com",
-  projectId: "gajkarna-f515d",
-  storageBucket: "gajkarna-f515d.firebasestorage.app",
-  messagingSenderId: "147288053718",
-  appId: "1:147288053718:web:2aba3e8d23c75599403677"
-};
+        apiKey: "AIzaSyAe1mZbAfdICSTbprjRz1vbbJJwRRtsTvE",
+        authDomain: "gajkarna-f515d.firebaseapp.com",
+        projectId: "gajkarna-f515d",
+        storageBucket: "gajkarna-f515d.firebasestorage.app",
+        messagingSenderId: "147288053718",
+        appId: "1:147288053718:web:2aba3e8d23c75599403677"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
@@ -1049,7 +1049,7 @@
     document.getElementById('addExpBtn').addEventListener('click', () => window.addRecord('exp'));
 
     // =====================================================================
-    // DONATION QR UPLOAD + UPI ID (FIXED & FUNCTIONAL)
+    // DONATION QR UPLOAD + UPI ID (FIXED & FULL ERROR HANDLING)
     // =====================================================================
     function renderAdminQr() {
         const frame = document.getElementById('adminQrFrame');
@@ -1074,13 +1074,14 @@
         const uploadBtn = document.getElementById('uploadQrBtn');
         const originalText = uploadBtn.textContent;
         uploadBtn.disabled = true;
-        uploadBtn.textContent = 'Processing...';
+        uploadBtn.textContent = 'Compressing...';
 
         const img = new Image();
         const reader = new FileReader();
         reader.onload = (ev) => {
             img.onload = async () => {
-                const maxDim = 500;
+                // Highly compressed sizes to keep network traffic minimal
+                const maxDim = 300;
                 let { width, height } = img;
                 if (width > maxDim || height > maxDim) {
                     const scale = maxDim / Math.max(width, height);
@@ -1093,14 +1094,16 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, width, height);
                 ctx.drawImage(img, 0, 0, width, height);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.60);
 
+                uploadBtn.textContent = 'Saving...';
                 try {
                     await setDoc(doc(db, "settings", "donationInfo"), { ...donationSettings, qrImage: dataUrl }, { merge: true });
                     showToast('QR code uploaded');
                 } catch (err) { 
-                    console.error("Firestore Save Error (QR Image Asset Setup):", err);
-                    showToast('Could not save QR — check console logs'); 
+                    console.error("Firestore Save Error (QR):", err);
+                    alert("Firestore Write Failure!\nReason: " + err.message + "\n\nDouble-check that database Rules allow access to the 'settings' path.");
+                    showToast('Could not save QR'); 
                 } finally {
                     uploadBtn.disabled = false;
                     uploadBtn.textContent = originalText;
@@ -1118,7 +1121,7 @@
             await setDoc(doc(db, "settings", "donationInfo"), { ...donationSettings, qrImage: '' }, { merge: true });
             showToast('QR code removed');
         } catch (err) { 
-            console.error("Firestore Save Error (QR Removal):", err);
+            console.error("Firestore Save Error (Remove QR):", err);
             showToast('Could not remove QR'); 
         }
     });
@@ -1134,8 +1137,9 @@
             await setDoc(doc(db, "settings", "donationInfo"), { ...donationSettings, upiId }, { merge: true });
             showToast('Saved');
         } catch (err) { 
-            console.error("Firestore Save Error (UPI Sync):", err);
-            showToast('Could not save — check console logs'); 
+            console.error("Firestore Save Error (UPI):", err);
+            alert("Firestore Write Failure!\nReason: " + err.message + "\n\nVerify your Firestore Rules configuration permits access.");
+            showToast('Could not save data'); 
         } finally {
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save';
