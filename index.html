@@ -296,7 +296,6 @@
     <p style="margin-top:16px;"><button class="back-link" id="goDonatePublic" style="margin:0 auto;"><i class="fas fa-heart"></i> Just want to donate? Tap here</button></p>
 </div>
 
-<!-- ============ PUBLIC DONATION PAGE ============ -->
 <div id="donatePage">
     <div class="top-card donate-hero">
         <img src="logo1.jpg" alt="Logo" class="logo-img" onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png';">
@@ -399,7 +398,6 @@
         <div id="leaderboardList"></div>
     </div>
 
-    <!-- ============ DONATION QR & LINK CARD ============ -->
     <div class="form-card">
         <h2 class="section-title text-gold"><span><i class="fas fa-qrcode"></i> Collect Donations</span></h2>
         <div class="donate-card-inner">
@@ -428,7 +426,6 @@
         </div>
     </div>
 
-    <!-- ============ PENDING DONATIONS ============ -->
     <div class="form-card" id="pendingCard" style="display:none;">
         <h2 class="section-title text-gold">
             <span><i class="fas fa-hourglass-half"></i> Pending Donations</span>
@@ -500,39 +497,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc, getDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-    // =====================================================================
-    // SECURITY NOTE — read this before relying on the PIN screen
-    // =====================================================================
-    // This PIN gate only hides the UI. It does NOT protect your Firestore
-    // data: anyone can view-source, read the Firebase config below, and
-    // talk to your database directly with their own code, bypassing this
-    // page entirely. The PIN's purpose is to keep casual visitors out of
-    // the *interface* — it is not a security boundary by itself. The new
-    // public donation page is designed to be reachable without the PIN,
-    // so it only ever writes to "pendingDonations" — never directly to
-    // "funds" — which keeps real totals under admin control.
-    //
-    // The real fix lives in the Firebase Console, not in this file:
-    // Firestore Database → Rules, and paste something like:
-    //
-    //   rules_version = '2';
-    //   service cloud.firestore {
-    //     match /databases/{database}/documents {
-    //       match /funds/{id}    { allow read, write: if request.time < timestamp.date(2027,1,1); }
-    //       match /expenses/{id} { allow read, write: if request.time < timestamp.date(2027,1,1); }
-    //       match /pendingDonations/{id} { allow read, write: if request.time < timestamp.date(2027,1,1); }
-    //       match /settings/{id} { allow read, write: if request.time < timestamp.date(2027,1,1); }
-    //     }
-    //   }
-    //
-    // That's still open-by-default (matches your current setup) but at
-    // least time-boxes it. For real protection, look into Firebase
-    // Anonymous Auth or App Check, which require more setup than a
-    // single HTML file can provide. I can walk you through either if
-    // you'd like — just ask.
-    // =====================================================================
+    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
     const SECRET_PIN = "1523";
     const MAX_ATTEMPTS = 5;
@@ -602,13 +567,13 @@
 
     // --- FIREBASE CONFIG ---
     const firebaseConfig = {
-  apiKey: "AIzaSyAe1mZbAfdICSTbprjRz1vbbJJwRRtsTvE",
-  authDomain: "gajkarna-f515d.firebaseapp.com",
-  projectId: "gajkarna-f515d",
-  storageBucket: "gajkarna-f515d.firebasestorage.app",
-  messagingSenderId: "147288053718",
-  appId: "1:147288053718:web:2aba3e8d23c75599403677"
-};
+        apiKey: "AIzaSyAe1mZbAfdICSTbprjRz1vbbJJwRRtsTvE",
+        authDomain: "gajkarna-f515d.firebaseapp.com",
+        projectId: "gajkarna-f515d",
+        storageBucket: "gajkarna-f515d.firebasestorage.app",
+        messagingSenderId: "147288053718",
+        appId: "1:147288053718:web:2aba3e8d23c75599403677"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
@@ -1084,7 +1049,7 @@
     document.getElementById('addExpBtn').addEventListener('click', () => window.addRecord('exp'));
 
     // =====================================================================
-    // DONATION QR UPLOAD + UPI ID
+    // DONATION QR UPLOAD + UPI ID (FIXED & FUNCTIONAL)
     // =====================================================================
     function renderAdminQr() {
         const frame = document.getElementById('adminQrFrame');
@@ -1106,11 +1071,15 @@
         if (!file) return;
         if (!file.type.startsWith('image/')) { showToast('Please choose an image file'); return; }
 
+        const uploadBtn = document.getElementById('uploadQrBtn');
+        const originalText = uploadBtn.textContent;
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Processing...';
+
         const img = new Image();
         const reader = new FileReader();
         reader.onload = (ev) => {
             img.onload = async () => {
-                // Downscale to keep the Firestore doc small
                 const maxDim = 500;
                 let { width, height } = img;
                 if (width > maxDim || height > maxDim) {
@@ -1129,7 +1098,13 @@
                 try {
                     await setDoc(doc(db, "settings", "donationInfo"), { ...donationSettings, qrImage: dataUrl }, { merge: true });
                     showToast('QR code uploaded');
-                } catch (err) { showToast('Could not save QR — check connection'); }
+                } catch (err) { 
+                    console.error("Firestore Save Error (QR Image Asset Setup):", err);
+                    showToast('Could not save QR — check console logs'); 
+                } finally {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = originalText;
+                }
             };
             img.src = ev.target.result;
         };
@@ -1142,15 +1117,29 @@
         try {
             await setDoc(doc(db, "settings", "donationInfo"), { ...donationSettings, qrImage: '' }, { merge: true });
             showToast('QR code removed');
-        } catch (err) { showToast('Could not remove QR'); }
+        } catch (err) { 
+            console.error("Firestore Save Error (QR Removal):", err);
+            showToast('Could not remove QR'); 
+        }
     });
 
     document.getElementById('saveUpiBtn').addEventListener('click', async () => {
         const upiId = document.getElementById('upiIdInput').value.trim();
+        const saveBtn = document.getElementById('saveUpiBtn');
+        
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        
         try {
             await setDoc(doc(db, "settings", "donationInfo"), { ...donationSettings, upiId }, { merge: true });
             showToast('Saved');
-        } catch (err) { showToast('Could not save — check connection'); }
+        } catch (err) { 
+            console.error("Firestore Save Error (UPI Sync):", err);
+            showToast('Could not save — check console logs'); 
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+        }
     });
 
     document.getElementById('copyLinkBtn').addEventListener('click', () => {
